@@ -1,0 +1,34 @@
+# Versão da API do Kubernetes usada para criar um Service
+apiVersion: v1
+
+# Tipo do recurso
+# Service é usado para expor uma aplicação dentro ou fora do cluster
+kind: Service
+
+# Metadados do Service
+metadata:
+  # Nome do Service
+  name: api-pagamentos-service
+
+# Especificações do Service
+spec:
+
+  # Tipo do Service
+  # LoadBalancer expõe a aplicação externamente usando um IP público
+  # Muito usado em ambientes cloud como Azure AKS, AWS EKS e Google GKE
+  type: LoadBalancer
+
+  # Selector usado para encontrar os pods que este Service irá expor
+  # Precisa ser igual ao label definido no Deployment
+  selector:
+    app: api-pagamentos
+
+  # Configuração das portas do Service
+  ports:
+    # Porta externa do Service
+    # O usuário acessará a aplicação pela porta 80
+    - port: 80
+
+      # Porta interna do container
+      # Deve ser a mesma porta configurada no containerPort do Deployment
+      targetPort: 3000

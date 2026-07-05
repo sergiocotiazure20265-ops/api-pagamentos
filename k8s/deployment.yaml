@@ -1,0 +1,51 @@
+# Versão da API do Kubernetes usada para criar um Deployment
+apiVersion: apps/v1
+
+# Tipo do recurso que será criado no Kubernetes
+# Deployment é usado para gerenciar réplicas de uma aplicação
+kind: Deployment
+
+# Metadados do Deployment
+metadata:
+  # Nome do Deployment
+  name: api-pagamentos
+
+# Especificações do Deployment
+spec:
+
+  # Quantidade de pods que serão criados para essa aplicação
+  replicas: 2
+
+  # Define como o Deployment irá encontrar os pods que ele gerencia
+  selector:
+    matchLabels:
+      # O Deployment irá controlar pods que tenham este label
+      app: api-pagamentos
+
+  # Modelo dos pods que serão criados pelo Deployment
+  template:
+
+    # Metadados dos pods
+    metadata:
+      labels:
+        # Label aplicado aos pods
+        app: api-pagamentos
+
+    # Especificações dos pods
+    spec:
+
+      # Lista de containers que serão executados dentro do pod
+      containers:
+
+      # Nome do container
+      - name: api-pagamentos
+
+        # Imagem Docker que será usada para criar o container
+        # Alterado de v1 para v2
+        image: sergiocoti/api-pagamentos:v1
+
+        # Portas expostas pelo container
+        ports:
+
+        # Porta interna onde a aplicação Node.js está rodando
+        - containerPort: 3000
