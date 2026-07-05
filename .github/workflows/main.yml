@@ -1,11 +1,11 @@
-# Nome do workflow que aparecerá na aba Actions do GitHub
+# Nome do workflow que aparecerá na aba "Actions" do GitHub
 name: CI/CD Api pagamentos
 
-# Define quando o workflow será executado
+# Define quando este workflow será executado
 on:
-  # Executa o workflow quando houver um push no repositório
+  # Executa o workflow sempre que houver um push no repositório
   push:
-    # Define em quais branches o workflow será executado
+    # Define em quais branches o workflow será disparado
     branches:
       # Executa somente quando o push for feito na branch main
       - main
@@ -13,14 +13,19 @@ on:
 # Define os jobs que serão executados pelo workflow
 jobs:
 
-  # Nome do job responsável por fazer build da imagem Docker,
-  # enviar para o Docker Hub e atualizar o deployment no Kubernetes
+  # Nome do job responsável por:
+  # 1. Baixar o código do repositório
+  # 2. Fazer login no Docker Hub
+  # 3. Gerar a imagem Docker multi-arquitetura
+  # 4. Enviar a imagem para o Docker Hub
+  # 5. Conectar no Kubernetes
+  # 6. Atualizar o Deployment
   build-and-deploy:
 
-    # Define que o job será executado em uma máquina virtual Linux do GitHub
+    # Define que o job será executado em uma máquina virtual Ubuntu
     runs-on: ubuntu-latest
 
-    # Lista de etapas que serão executadas dentro do job
+    # Lista de etapas executadas dentro do job
     steps:
 
       # Etapa responsável por baixar o código-fonte do repositório
@@ -28,38 +33,55 @@ jobs:
       - name: Checkout código
         uses: actions/checkout@v3
 
-      # Etapa responsável por fazer login no Docker Hub
-      # usando usuário e senha/token armazenados nos Secrets do GitHub
+      # Etapa responsável por autenticar no Docker Hub
+      # usando usuário e senha/token configurados nos Secrets do GitHub
       - name: Login Docker Hub
         uses: docker/login-action@v2
         with:
-          # Usuário do Docker Hub cadastrado em:
+          # Usuário do Docker Hub armazenado em:
           # Settings > Secrets and variables > Actions
           username: ${{ secrets.DOCKER_USERNAME }}
 
-          # Senha ou token de acesso do Docker Hub cadastrado nos Secrets
+          # Senha ou token do Docker Hub armazenado nos Secrets do GitHub
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # Etapa responsável por construir a imagem Docker da aplicação
-      # A tag da imagem será gerada automaticamente usando o número da execução
-      # Exemplo: sergiocoti/api-pagamentos:v1, v2, v3, v4...
-      - name: Build imagem
-        run: docker build -t sergiocoti/api-pagamentos:v${{ github.run_number }} .
+      # Etapa responsável por configurar o Docker Buildx
+      # O Buildx permite gerar imagens para múltiplas arquiteturas,
+      # como AMD64 e ARM64
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      # Etapa responsável por enviar a imagem Docker criada para o Docker Hub
-      # A imagem enviada terá a mesma versão gerada no build
-      - name: Push imagem
-        run: docker push sergiocoti/api-pagamentos:v${{ github.run_number }}
+      # Etapa responsável por construir e enviar a imagem Docker
+      # diretamente para o Docker Hub
+      - name: Build e Push imagem multi-arquitetura
+        uses: docker/build-push-action@v6
+        with:
+          # Define o diretório onde está o Dockerfile
+          # O ponto "." indica a raiz do projeto
+          context: .
+
+          # Define que a imagem será enviada para o Docker Hub
+          # após ser construída
+          push: true
+
+          # Define as arquiteturas suportadas pela imagem
+          # linux/amd64: compatível com processadores Intel/AMD
+          # linux/arm64: compatível com processadores ARM, comum em alguns clusters AKS
+          platforms: linux/amd64,linux/arm64
+
+          # Define o nome e a versão da imagem Docker
+          # github.run_number gera uma versão automática a cada execução
+          # Exemplo: v1, v2, v3, v4...
+          tags: sergiocoti/api-pagamentos:v${{ github.run_number }}
 
       # Etapa responsável por configurar o acesso ao cluster Kubernetes
-      # O conteúdo do kubeconfig deve estar salvo no Secret KUBE_CONFIG
+      # O kubeconfig deve estar salvo no Secret KUBE_CONFIG do GitHub
       - name: Configurar kubeconfig
-        run: |         
+        run: |
           mkdir -p $HOME/.kube
           echo "${{ secrets.KUBE_CONFIG }}" > $HOME/.kube/config
 
-      # Etapa responsável por atualizar a imagem do container no Deployment
-      # O Kubernetes passará a usar a nova imagem publicada no Docker Hub
+      # Etapa responsável por atualizar a imagem usada pelo Deployment no Kubernetes
       - name: Atualizar deployment
-        run: |         
+        run: |
           kubectl set image deployment/api-pagamentos api-pagamentos=sergiocoti/api-pagamentos:v${{ github.run_number }}
